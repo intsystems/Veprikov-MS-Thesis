@@ -1,7 +1,7 @@
 <table>
     <tr>
         <td align="center"> <b> Название исследуемой задачи </b> </td>
-        <td> Оптимальное управление в системах машинного обучения с обратной связью: предотвращение деградации и оттока пользователей </td>
+        <td> Optimal Control of Feedback Loops in Continual Learning </td>
     </tr>
     <tr>
         <td align="center"> <b> Тип научной работы </b> </td>
