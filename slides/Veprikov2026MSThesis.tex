@@ -1,0 +1,351 @@
+\documentclass{beamer}
+\beamertemplatenavigationsymbolsempty
+\usecolortheme{beaver}
+\setbeamertemplate{blocks}[rounded=true, shadow=true]
+\setbeamertemplate{footline}[page number]
+
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amssymb,amsfonts,amsmath,mathtools,mathtext}
+\usepackage{subfig}
+\usepackage[all]{xy}
+\usepackage{array}
+\usepackage{multicol}
+\usepackage{hyperref}
+\usepackage{hhline}
+\usepackage{wrapfig}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc, shapes}
+
+\graphicspath{ {fig/} }
+
+\newtheorem{theorem_rus}{Теорема}
+\newtheorem{lemma_rus}{Лемма}
+\newtheorem{corollary_rus}{Следствие}
+\setbeamertemplate{theorems}[numbered]
+
+% Математические макросы
+\newcommand{\cL}{\mathcal{L}}
+\newcommand{\cE}{\mathcal{E}}
+\newcommand{\cD}{\mathcal{D}}
+\newcommand{\bH}{\mathbf{H}}
+\newcommand{\bP}{\mathbf{P}}
+\newcommand{\bX}{\mathbf{X}}
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\by}{\mathbf{y}}
+\newcommand{\bbE}{\mathbb{E}}
+\newcommand{\btheta}{\boldsymbol{\theta}}
+
+\title[\hbox to 56mm{Задача оптимального управления в системах ИИ с обратной связью}]{Задача оптимального управления\\ в системах искусственного интеллекта\\ с обратной связью}
+\author[А.\,С.~Веприков]{Андрей Сергеевич Веприков\\
+\small Научный руководитель: к.\,ф.-м.\,н. А.\,С.~Хританков}
+\institute{Кафедра интеллектуальных систем ФПМИ МФТИ\\
+Специализация: Интеллектуальный анализ данных}
+\date{Москва, 2026}
+
+\begin{document}
+
+% =====================================================================
+% 1. Титул
+% =====================================================================
+\begin{frame}
+\thispagestyle{empty}
+\maketitle
+\end{frame}
+
+% =====================================================================
+% 2. Положения, выносимые на защиту (в начале, 2 колонки)
+% =====================================================================
+\begin{frame}{Положения, выносимые на защиту}
+    \small
+    \begin{enumerate}
+        \item Единая постановка задачи оптимального управления для систем машинного обучения со скрытой петлей обратной связи.
+        \item Эффект деградации системы при прогнозировании цен как частный случай постановки. Предложено условие на сохранение наблюдаемой выборки.
+        \item Метод Generative Replay сведен к этой постановке через управление $u_t \in [0, 1]$ и условие $\varepsilon_t$-допустимости.
+        \item Верхняя оценка средней ошибки модели для произвольного расписания. Спектральная оценка финальной ошибки через гессианы задач без предположения об их коммутативности.
+        \item Оценка финальной ошибки через $\sum_t \|\Delta_t\|^2$, обосновывающая жадный выбор порядка задач. Условия сходимости в среднем квадратичном, совпадающие с условиями Роббинса-Монро.
+        \item Экспериментальная проверка на синтетических задачах и на реальном датасете медицинских изображений NIH ChestX-Ray.
+    \end{enumerate}
+\end{frame}
+
+% =====================================================================
+% 3. Постановка задачи
+% =====================================================================
+\begin{frame}{Постановка задачи}
+    Система МО с петлей обратной связи: предсказания модели на шаге $t$ через реакцию среды меняют обучающую выборку на шаге $t+1$.
+
+    Состояние системы --- пара $(f_t, h_t)$: $f_t$ есть плотность данных среды, $h_t$ есть плотность весов модели $\btheta^t$.
+    \[
+        h_{t+1} = \bH_t(f_t, h_t, u_t), \qquad f_{t+1} = \bP_t(f_t, h_{t+1}).
+    \]
+    $\bH_t$ --- оператор обучения, $\bP_t$ --- оператор реакции среды. Управление $u_t$ действует только на алгоритм обучения.
+    \begin{block}{Оптимизационная задача}
+        \[
+            \max_{u_1, \ldots, u_T} \sum_{t=0}^{T} \gamma^t\, r(f_t, h_{t+1})
+            \quad \text{при условии} \quad g(f_t, h_{t+1}) \le 0.
+        \]
+    \end{block}
+    Условие $g \le 0$ задает требования к сохранению петли обратной связи и к невырождению системы.
+\end{frame}
+
+% =====================================================================
+% 4a. Пример 1: Постановка и схема одного шага
+% =====================================================================
+\begin{frame}{Пример 1. Деградация системы. Постановка}
+    \vspace{-2mm}
+    Модель регрессии $m_{\btheta^t}$ предсказывает цены на жилье. На шаге $t$ случайному покупателю предлагается цена $$z_t = m_{\btheta^t}(\bx_i) + u_t.$$
+    С вероятностью $$p_t \propto \exp[-(z_t - y_i^0)/y_i^0]$$ покупатель соглашается, и пара $(\bx_i, z_t)$ заменяет элемент активной выборки. Иначе индекс $i$ удаляется. Цель управления: максимизировать среднюю цену сделки, не разрушив петлю.
+    \vspace{-1mm}
+    \begin{figure}
+    \centering
+    \resizebox{0.95\linewidth}{!}{%
+    \begin{tikzpicture}[
+        >=Stealth, thick, font=\small,
+        box/.style={draw, rounded corners=8pt, align=center, inner sep=8pt, minimum width=4.2cm, minimum height=1.4cm},
+        diam/.style={draw, diamond, aspect=2.2, align=center, inner sep=2pt, minimum width=4.2cm, minimum height=1.6cm},
+        lbl/.style={font=\footnotesize, align=center}
+    ]
+        \node[diam] (U) at (0, 4.6) {Пользователь};
+        \node[diam] (C) at (9.5, 4.6) {Управление $u_t$};
+        \node[box]  (D) at (0, 0)   {Активная выборка\\$(\bX_t, \by_t) \sim f_t$};
+        \node[box]  (M) at (9.5, 0) {Модель $m_{\btheta^t}$};
+
+        \draw[->] (D.east) -- (M.west);
+        \draw[->] (M.east) -- ++(1.4,0) |- (C.east);
+        \draw[->] (C.west) -- (U.east);
+        \draw[->] (U.south) -- (D.north);
+
+        \node[lbl, above=1pt] at ($(D.east)!0.5!(M.west)$) {обучение раз в $\tau$ шагов};
+        \node[lbl, below=1pt] at ($(D.east)!0.5!(M.west)$) {$h_{t+1} = \bH_t(f_t, h_t, u_t)$};
+
+        \node[lbl, anchor=west, align=left] at (10, 2.3)
+            {$y' = m_{\btheta^t}(\bx^i)$\\[1pt]$g(f_t, h_{t+1}, u_t) \le 0$};
+
+        \node[lbl, above=1pt] at ($(C.west)!0.5!(U.east)$) {выбираем $u_t$};
+        \node[lbl, below=1pt] at ($(C.west)!0.5!(U.east)$) {$z_t = y' + u_t$};
+
+        \node[lbl, anchor=east, align=right] at (-0.4, 2.3)
+            {согласие $(\bx^i, z_t)$ с вер. $p_t$\\отказ: индекс $i$ удален};
+        \node[lbl, anchor=west, align=left] at (0.4, 2.3)
+            {$f_{t+1} = \bP_t(f_t, h_{t+1})$};
+
+        \node[lbl] at ($(D)!0.5!(M) + (0, -0.9)$) {$t \leftarrow t + 1$};
+    \end{tikzpicture}%
+    }
+    \end{figure}
+\end{frame}
+
+% =====================================================================
+% 4b. Пример 1: Два условия и результаты
+% =====================================================================
+\begin{frame}{Пример 1. Деградация системы. Результаты}
+    \vspace{-2mm}
+    Два варианта условия $g$ задают две жадные стратегии: 
+    \begin{itemize}
+        \item \textbf{Наивная.} $g(f_t, h_{t+1}, u_t) = -\log p_t$. Максимизируем вероятность сделки на текущем покупателе.
+        \item \textbf{Аккуратная.} $g(f_t, h_{t+1}, u_t) = \delta - N_{t+1}/N_t$. Максимизируем долю сохраненной выборки.
+    \end{itemize}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.49\linewidth]{N_california_smart_greedy_30.pdf}
+        \includegraphics[width=0.49\linewidth]{r2-y_california_smart_greedy_30_N.pdf}
+    \end{figure}
+    \vspace{-3mm}
+    Наивная стратегия максимизирует локальную метрику $R^2$ и одновременно ведет $N_t \to 0$, то есть формально метрика растет, а система деградирует. Аккуратная стратегия сохраняет $N_t$ на стабильном уровне, $R^2$ растет медленнее, но система продолжает работать.
+\end{frame}
+
+% =====================================================================
+% 5. Пример 2: Generative Replay
+% =====================================================================
+\begin{frame}{Пример 2. Generative Replay как задача управления}
+    Поток задач $D_1, \ldots, D_T$. Управление $u_t \in [0, 1]$ --- доля новых данных в обучающей выборке. Часть $(1-u_t)$ синтезируется генератором $G_t$ с метками самодистилляции от $m_{\btheta^t}$. Функционал обучения:
+    \begin{align*}
+        \cL_{\text{train}}(\btheta, u_t) &= u_t\, \bbE_{(\bx, y) \sim D_{t+1}}\bigl[\cL(m_{\btheta}(\bx), y)\bigr] \\
+        &\quad + (1 - u_t)\, \bbE_{\bx' \sim G_t}\bigl[\cL(m_{\btheta}(\bx'), m_{\btheta^t}(\bx'))\bigr].
+    \end{align*}
+    Условие $g$ принимает форму $\varepsilon_t$-допустимости: $$\cL^*_t(u_t) = \min_{\btheta} \cL_{\text{train}}(\btheta, u_t) \le \varepsilon_t.$$
+    \vspace{-5mm}
+    \begin{figure}
+        \centering
+        \includegraphics[width=1\linewidth]{figure_training_new_task_v9.pdf}
+    \end{figure}
+\end{frame}
+
+% =====================================================================
+% 6. Теорема 1: Верхняя оценка средней ошибки
+% =====================================================================
+\begin{frame}{Теорема 1. Верхняя оценка средней ошибки}
+    \footnotesize
+    \vspace{-2mm}
+    \begin{theorem_rus}[Верхняя оценка средней ошибки]
+        Рассмотрим взвешеную среднюю ошибку \vspace{-2mm}$$\cL^{(w)}_T = \sum_{s=1}^T w_{s, T} \cdot \cL_s(\btheta^T),\vspace{-3mm}$$ 
+        где веса $w_{s, T}$ индуцируются расписанием $u_T$. Пусть $\overline{\cE}_j$ --- накопленная ошибка генератора. Тогда при $\varepsilon_T$-допустимости управления
+        \vspace{-2mm}
+        \[
+            \cL^{(w)}_{T} \le \sum_{s=1}^{T}\left(\prod_{r=s}^{T}(1 - u_r)\right)\varepsilon_s + \sum_{s=1}^{T}\left(\prod_{r=s}^{T}(1 - u_r)\right) \overline{\cE}_s,
+            \vspace{-3mm}
+        \]
+    \end{theorem_rus}
+    При $u_t = \frac{1}{t+1}$ веса равномерны ($w_{s, T} = 1/T$) и оценка принимает вид
+    \vspace{-2mm}
+    \[
+        \cL_T \le \frac{1}{T}\sum_{s=1}^{T}s \cdot \varepsilon_s + \frac{1}{T}\sum_{s=2}^{T}s \cdot \overline{\cE}_s.
+    \]
+    \vspace{-3mm}
+    \begin{figure}
+        \centering
+        \includegraphics[width=\linewidth]{parabola_losses.pdf}
+    \end{figure}
+\end{frame}
+
+% =====================================================================
+% 7. Спектральная теория + лемма + следствие SVD
+% =====================================================================
+\begin{frame}{Спектральная теория и условие нулевого конфликта}
+    \footnotesize
+    \vspace{-2mm}
+    \begin{itemize}
+        \item $R_t(\btheta) = \bbE_{\bx \sim G_t}[\cL(m_{\btheta}(\bx), m_{\btheta^t}(\bx))], \Sigma_t = \nabla^2 R_t(\btheta^t)$ --- функционал и гессиан повторения на шаге $t+1$. 
+        
+        \item $\theta^*_{t+1}, \varepsilon^*_{t+1} = \cL_{t+1}(\theta^*_{t+1}), H_{t+1} = \nabla^2 \cL_{t+1}(\btheta^*_{t+1})$ --- оптимум, значение в оптимуме и гессиан новой задачи $t+1$. 
+        
+        \item $\Delta_t = \btheta^*_{t+1} - \btheta^t$ --- смещение оптимума новой задачи $\btheta^*_{t+1}$ от текущей модели $\btheta^t$.
+    \end{itemize}
+    \begin{lemma_rus}[Замкнутая форма $\cL^*_t$]
+        В квадратичном приближении при $u_t = 1/(t+1)$
+        \vspace{-2mm}
+        \[
+            \varepsilon_t = \cL^*_t(u_t) = \frac{\varepsilon^*_{t+1}}{t+1} + \pi_t,
+            \quad
+            \pi_t = \tfrac{t}{2(t+1)}\Delta_t^\top H_{t+1} (H_{t+1} + t\Sigma_t)^{-1} \Sigma_t\, \Delta_t.
+        \]
+    \end{lemma_rus}
+    \vspace{-4mm}
+    \begin{corollary_rus}[Условие нулевого конфликта]
+        Если $H_{t+1} \Sigma_t = 0$ для всех $t$, то $\pi_t = 0$ и $\cL_T = \bar\varepsilon^*$.
+    \end{corollary_rus}
+    \vspace{-2mm}
+    \begin{figure}
+        \centering
+        \includegraphics[width=\linewidth]{svd_losses.pdf}
+    \end{figure}
+\end{frame}
+
+% =====================================================================
+% 8. Теорема 2: оценка через сумму ||Delta_t||^2 + жадный порядок
+% =====================================================================
+\begin{frame}{Теорема 2. Оценка через диаметр траектории}
+    Из Леммы 1 и неравенства $\pi_t \le \tfrac{\|H_{t+1}\|_{\text{op}} \|\Delta_t\|^2}{2(t+1)} \le \tfrac{L\|\Delta_t\|^2}{2(t+1)}$:
+    \begin{theorem_rus}[Оценка через $\sum \|\Delta_t\|^2$]
+        Пусть $\|H_{t+1}\|_{\text{op}}, \|\Sigma_t\|_{\text{op}} \le L$. При $u_t = 1/(t+1)$
+        \[
+            \cL_T \le \frac{1}{T}\sum_{t=1}^{T} \varepsilon^*_t + \frac{L}{2T}\sum_{t=1}^{T-1} \|\Delta_t\|^2.
+        \]
+    \end{theorem_rus}
+    \vspace{-5mm}
+    Зависимость от перестановки задач локализована в $\sum_t \|\Delta_t\|^2$. Жадная стратегия минимизирует эту сумму.
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.6\linewidth]{T_sweep_greedy_ordering.pdf}
+    \end{figure}
+\end{frame}
+
+% =====================================================================
+% 9. Теорема 3: bias-variance и Роббинс-Монро
+% =====================================================================
+\begin{frame}{Теорема 3. Сходимость в среднем квадратичном}
+    При одинаковых гессианах $H_s = H$, $\Sigma_t = H$ и независимых оптимумах $\btheta^*_s$ с $\bbE[\btheta^*_s] = \mu^*$, $\mathrm{Cov}(\btheta^*_s) = C^*$ шаг GR становится экспоненциальным скользящим средним $$\btheta^{t+1} = (1 - u_t)\btheta^t + u_t \btheta^*_{t+1}.$$
+    \vspace{-7mm}
+    \begin{theorem_rus}[Условия сходимости]
+        Если $\sum_t u_t = \infty$ и $u_t \to 0$, то $\bbE\|\btheta^t - \mu^*\|^2 \to 0$. Условия совпадают с классическими условиями Роббинса-Монро.
+    \end{theorem_rus}
+    Эксперимент на линейной рекурсии: разложение MSE на смещение и дисперсию совпадает с теорией.
+    \vspace{-1mm}
+    \begin{figure}
+        \centering
+        \includegraphics[width=\linewidth]{bias_variance.pdf}
+    \end{figure}
+\end{frame}
+
+% =====================================================================
+% 10. ChestX-Ray: описание задачи + примеры рентгенов
+% =====================================================================
+\begin{frame}{Реальный датасет: NIH ChestX-Ray}
+    \vspace{-3mm}
+    Рентгены грудной клетки, пять патологий как задачи $D_1, \ldots, D_5$ бинарной классификации. Модель MobileNetV2, предобученная на ImageNet.
+    \vspace{-1mm}
+    \begin{figure}
+        \centering
+        \begin{tabular}{@{}c@{\hspace{2pt}}c@{\hspace{2pt}}c@{\hspace{2pt}}c@{}}
+            \includegraphics[width=0.2\textwidth]{00000001_000.png} &
+            \includegraphics[width=0.2\textwidth]{00011558_011.png} &
+            \includegraphics[width=0.2\textwidth]{00024719_000.png} &
+            \includegraphics[width=0.2\textwidth]{00024731_000.png}
+        \end{tabular}
+    \end{figure}
+    \vspace{-2mm}
+    Сравниваются четыре семейства расписаний $u_t$: 
+    \texttt{inv} ($u_t = \alpha/(t+1)$), \texttt{const} ($u_t = u$), \texttt{exp} (экспоненциально убывающее) и \texttt{adaptive} ($u_t = r_t/(r_t + t \lambda g_t)$ по наблюдаемым ошибкам).
+    \vspace{-2mm}
+    \begin{figure}
+        \centering
+        \includegraphics[width=\linewidth]{control_schedules.pdf}
+    \end{figure}
+\end{frame}
+
+% =====================================================================
+% 11. ChestX-Ray: результаты — только картинки
+% =====================================================================
+\begin{frame}{ChestX-Ray: сравнение расписаний}
+    \begin{figure}
+        \centering
+        \includegraphics[width=\linewidth]{cxr_summary_bar.pdf}
+    \end{figure}
+    \vspace{-3mm}
+    \begin{center}
+        Расписание $u_t = 1{,}5/(t+1)$ устойчиво лучшее: уступает совместному обучению на $5{,}5 \%$ по средней метрике AUC.
+    \end{center}
+\end{frame}
+
+% =====================================================================
+% 12. ChestX-Ray: динамика AUC по блокам
+% =====================================================================
+\begin{frame}{ChestX-Ray: динамика AUC по блокам обучения}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.92\linewidth]{cxr_auc_trajectory.pdf}
+    \end{figure}
+    \vspace{-3mm}
+    \begin{center}
+        После первого появления каждого класса модель удерживает AUC около достигнутого уровня без катастрофических потерь.
+    \end{center}
+\end{frame}
+
+% =====================================================================
+% 13. Личный вклад
+% =====================================================================
+\begin{frame}{Личный вклад автора}
+    \begin{itemize}
+        \item \textbf{Теория.} Введена постановка задачи оптимального управления. Эффект деградации и Generative Replay сведены к этой постановке. Доказаны верхняя оценка средней ошибки, спектральная оценка без коммутативности гессианов, оценка через $\sum_t \|\Delta_t\|^2$, разложение MSE и условия сходимости.
+
+        \item \textbf{Эксперименты.} Реализован протокол со скользящим окном. Проведены эксперименты на задаче прогнозирования цен, на синтетических задачах и на NIH ChestX-Ray.
+
+        \item \textbf{Новизна.} Generative Replay впервые представлен как задача оптимального управления. Условия сходимости согласованы с теорией Роббинса-Монро.
+    \end{itemize}
+\end{frame}
+
+% =====================================================================
+% 14. Спасибо
+% =====================================================================
+\begin{frame}
+    \vspace{1.5cm}
+    \begin{center}
+        {\Large \textbf{Спасибо за внимание!}}
+        \vspace{1cm}
+
+        \large Готов ответить на вопросы.
+    \end{center}
+\end{frame}
+
+\end{document}

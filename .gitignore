@@ -1,0 +1,21 @@
+# Local code, kept out of the repo
+dynamic-systems-model/
+
+# macOS metadata
+.DS_Store
+
+# Editor / agent metadata
+.claude/
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.toc
+*.nav
+*.snm
+*.synctex.gz
